@@ -4,7 +4,7 @@ uuid=$(uuidgen)
 
 TABLE="speed_test"
 DB_USER="root"
-DB_PASSWD="M0nday14##"
+DB_PASSWD="password"
 DB_NAME="speedy"
 
 function show_help(){
