@@ -1,0 +1,132 @@
+#!/bin/bash
+
+uuid=$(uuidgen)
+
+TABLE="speed_test"
+DB_USER="root"
+DB_PASSWD="M0nday14##"
+DB_NAME="speedy"
+
+function show_help(){
+
+echo "usage: ./speeder start|stop|status"
+
+echo "start = start process"
+
+echo "stop = stop process"
+
+echo "status = get status of process"
+
+}
+
+function runTest(){
+
+echo "Beginning Speed Test:" $uuid
+
+speedtest-cli > ./latest.test
+
+}
+
+function analyzeTest(){
+
+hosted_by=$(grep "Hosted" latest.test | awk '{print $3}')
+download_speed=$(grep "Download" latest.test | awk '{print $2}')
+upload_speed=$(grep "Upload" latest.test | awk '{print $2}')
+
+echo "Hosted By:" $hosted_by 
+echo "Download Speed:" $download_speed
+echo "Upload Speed:" $upload_speed
+
+}
+
+function persistData(){
+
+/usr/local/mysql/bin/mysql --user=$DB_USER --password=$DB_PASSWD $DB_NAME << EOF
+INSERT INTO $TABLE (\`speed_test_id\`, \`host\`, \`download_speed\`, \`upload_speed\`) VALUES ("$uuid", "$hosted_by", "$download_speed", "$upload_speed");
+EOF
+
+}
+
+function cleanUp(){
+
+rm -fr ./latest.test
+
+}
+
+
+function start(){
+
+runTest
+
+analyzeTest
+
+persistData
+
+cleanUp
+
+}
+
+function stop(){
+
+pid=$(cat ./pid_file)
+
+sudo kill -9 $pid
+
+rm -f ./pid_file
+
+}
+
+function status(){
+ 
+ if [ ! -f ./pid_file ]; 
+ then
+    echo "Process not running"
+ fi
+
+ if [ -f ./pid_file ];
+ 	then
+ 	pid=$(cat ./pid_file)
+ 	echo "Process is running: " $pid
+ fi
+
+}
+
+OPTIND=1         # Reset in case getopts has been used previously in the shell.
+
+
+while getopts "h?vf:" opt; do
+    case "$opt" in
+    h|\?)
+        show_help
+        exit 0
+        ;;
+    esac
+done
+
+shift $((OPTIND-1))
+
+[ "$1" = "--" ] && shift
+
+command=$1
+
+if [ -z "$command" ] 
+then
+echo "Arguments required. Use -h for help."
+exit 1
+fi
+
+if [ $command == "start" ]
+then
+while true; do start >> output.log 2>&1; sleep 30; done &
+echo $! > pid_file
+fi
+
+if [ $command == "stop" ] 
+then
+stop
+fi
+
+if [ $command == "status" ] 
+then
+status
+fi
